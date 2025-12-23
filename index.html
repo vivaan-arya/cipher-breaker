@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Probabilistic Classical Cipher Breaking</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8f9fa;
+      --text-primary: #000000;
+      --text-secondary: #4a5568;
+      --accent: #1e3a8a;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --error: #ef4444;
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --text-primary: #ffffff;
+      --text-secondary: #94a3b8;
+      --accent: #3b82f6;
+      --border: #334155;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    nav a:hover, nav a.active {
+      color: var(--accent);
+    }
+
+    .theme-toggle {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      width: 50px;
+      height: 28px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .theme-toggle::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      top: 3px;
+      left: 4px;
+      transition: transform 0.3s;
+    }
+
+    [data-theme="dark"] .theme-toggle::after {
+      transform: translateX(22px);
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+      margin-bottom: 3rem;
+    }
+
+    .cipher-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .cipher-card {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: center;
+    }
+
+    .cipher-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .cipher-card.selected {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    .cipher-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .cipher-card p {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .input-section {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 1rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-size: 0.95rem;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .char-counter {
+      text-align: right;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .char-counter.warning {
+      color: var(--error);
+    }
+
+    .char-counter.valid {
+      color: var(--success);
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 1rem 2.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .result-section {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-top: 2rem;
+      display: none;
+    }
+
+    .result-section.show {
+      display: block;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-header h3 {
+      font-size: 1.5rem;
+    }
+
+    .result-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-label {
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.5rem;
+    }
+
+    .result-value {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-size: 1rem;
+      word-break: break-word;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+
+    .spinner {
+      border: 3px solid var(--border);
+      border-top: 3px solid var(--accent);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .about-content {
+      max-width: 800px;
+    }
+
+    .about-section {
+      margin-bottom: 3rem;
+    }
+
+    .about-section h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+
+    .about-section p {
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+    }
+
+    .highlight {
+      background: var(--bg-secondary);
+      padding: 1.5rem;
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      margin: 1.5rem 0;
+    }
+
+    @media (max-width: 768px) {
+      .cipher-selector {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      .container {
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <div class="container">
+    <header>
+      <a href="#" class="logo" onclick="showPage('decrypt')">CipherBreaker</a>
+      <nav>
+        <a href="#" class="nav-link active" data-page="decrypt">Decrypt</a>
+        <a href="#" class="nav-link" data-page="encrypt">Encrypt</a>
+        <a href="#" class="nav-link" data-page="about">About</a>
+        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
+      </nav>
+    </header>
+
+    <!-- Decrypt Page -->
+    <div id="decrypt-page" class="page active">
+      <h1>Probabilistic Cipher Breaker</h1>
+      <p class="subtitle">Break classical ciphers using Cross-Entropy Method</p>
+
+      <div class="cipher-selector">
+        <div class="cipher-card" onclick="selectCipher('caesar')">
+          <h3>Caesar Cipher</h3>
+          <p>Simple substitution cipher with shift</p>
+        </div>
+        <div class="cipher-card" onclick="selectCipher('vigenere')">
+          <h3>Vigenère Cipher</h3>
+          <p>Polyalphabetic substitution cipher</p>
+        </div>
+      </div>
+
+      <div class="input-section">
+        <label for="ciphertext">Ciphertext</label>
+        <textarea id="ciphertext" placeholder="Enter encrypted text here..."></textarea>
+        <div id="char-counter" class="char-counter">0 characters</div>
+      </div>
+
+      <button id="decrypt-btn" class="btn" onclick="breakCipher()" disabled>Decrypt</button>
+
+      <div id="result-section" class="result-section">
+        <div class="result-header">
+          <h3>Results</h3>
+        </div>
+        <div class="result-box">
+          <div class="result-label">Decrypted Text</div>
+          <div id="plaintext" class="result-value"></div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">Key</div>
+          <div id="key" class="result-value"></div>
+        </div>
+        <div class="result-box" id="efficiency-box" style="display: none;">
+          <div class="result-label">Algorithm Efficiency</div>
+          <div id="efficiency" class="result-value"></div>
+        </div>
+      </div>
+
+      <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Breaking cipher...</p>
+      </div>
+    </div>
+
+    <!-- Encrypt Page -->
+    <div id="encrypt-page" class="page">
+      <h1>Encrypt Text</h1>
+      <p class="subtitle">Encrypt plaintext using Caesar or Vigenère cipher</p>
+
+      <div class="cipher-selector">
+        <div class="cipher-card" onclick="selectEncryptCipher('caesar')">
+          <h3>Caesar Cipher</h3>
+          <p>Simple substitution cipher with shift</p>
+        </div>
+        <div class="cipher-card" onclick="selectEncryptCipher('vigenere')">
+          <h3>Vigenère Cipher</h3>
+          <p>Polyalphabetic substitution cipher</p>
+        </div>
+      </div>
+
+      <div class="input-section">
+        <label for="plaintext-input">Plaintext</label>
+        <textarea id="plaintext-input" placeholder="Enter text to encrypt..."></textarea>
+        <div id="encrypt-char-counter" class="char-counter">0 characters</div>
+      </div>
+
+      <div class="input-section">
+        <label for="key-input">Key</label>
+        <input type="text" id="key-input" placeholder="Enter key..." maxlength="10" style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; font-size: 0.95rem; text-transform: uppercase;">
+        <div id="key-hint" class="char-counter" style="text-align: left; margin-top: 0.5rem;"></div>
+      </div>
+
+      <button id="encrypt-btn" class="btn" onclick="encryptText()" disabled>Encrypt</button>
+
+      <div id="encrypt-result-section" class="result-section">
+        <div class="result-header">
+          <h3>Results</h3>
+        </div>
+        <div class="result-box">
+          <div class="result-label">Encrypted Text</div>
+          <div id="ciphertext-output" class="result-value"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- About Page -->
+    <div id="about-page" class="page">
+      <div class="about-content">
+        <h1>About This Project</h1>
+
+        <div class="about-section">
+          <h2>Background</h2>
+          <p>
+            Hi I'm Vivaan, an International Baccalaureate Diploma Programme (IBDP) student with a deep passion for mathematics and computer science. This project represents the culmination of extensive research into probabilistic methods for cryptanalysis, undertaken under the mentorship of Konstantinos Brazitikos, a PhD student at the University of Edinburgh.
+          </p>
+          <p>
+            Through this research collaboration, I explored how modern optimization algorithms can be applied to classical encryption schemes, bridging historical cipher-breaking techniques with contemporary computational methods.
+          </p>
+        </div>
+
+        <div class="about-section">
+          <h2>What is the Cross-Entropy Method?</h2>
+          <p>
+            The Cross-Entropy Method (CEM) is a Monte Carlo method for optimization that originated from rare-event simulation. Unlike traditional brute-force approaches, CEM uses an iterative process to intelligently search through the solution space.
+          </p>
+          
+          <div class="highlight">
+            <p><strong>How CEM works:</strong></p>
+            <p>
+              1. <strong>Sampling:</strong> Generate a population of candidate solutions from a probability distribution<br>
+              2. <strong>Evaluation:</strong> Score each candidate based on how well it decrypts the ciphertext<br>
+              3. <strong>Selection:</strong> Keep the best-performing candidates (elite samples)<br>
+              4. <strong>Update:</strong> Adjust the probability distribution to favor characteristics of elite samples<br>
+              5. <strong>Iterate:</strong> Repeat until convergence to the optimal solution
+            </p>
+          </div>
+
+          <p>
+            This approach is particularly effective for cryptanalysis because it can navigate large search spaces (like all possible Vigenère keys) without exhaustively testing every possibility. The algorithm "learns" which keys are more promising and focuses computational effort accordingly.
+          </p>
+        </div>
+
+        <div class="about-section">
+          <h2>Breaking Ciphers with CEM</h2>
+          <p>
+            <strong>Caesar Cipher:</strong> The algorithm searches through all 26 possible shift values, using English letter frequency analysis to score each candidate decryption. CEM quickly converges on the correct shift by recognizing natural language patterns.
+          </p>
+          <p>
+            <strong>Vigenère Cipher:</strong> This is significantly more challenging due to the enormous key space (26<sup>k</sup> possibilities for a key of length k). CEM excels here by:
+          </p>
+          <ul style="margin-left: 2rem; color: var(--text-secondary);">
+            <li>Maintaining a probability distribution over possible keys</li>
+            <li>Using bigram and trigram frequencies to evaluate decryption quality</li>
+            <li>Iteratively refining the key character by character</li>
+            <li>Converging to the optimal key without testing every combination</li>
+          </ul>
+          <p>
+            The scoring function evaluates how closely the decrypted text matches natural English text by comparing letter frequency distributions, common bigrams (like "th", "he", "an"), and trigrams (like "the", "and", "ing"). Higher scores indicate text that looks more like genuine English, guiding the algorithm toward the correct key.
+          </p>
+        </div>
+
+        <div class="about-section">
+          <h2>Technical Implementation</h2>
+          <p>
+            This web application connects to a backend API that implements the CEM algorithm using statistical language models trained on English text corpora. The system analyzes ciphertext character distributions and iteratively refines key candidates until optimal decryption is achieved.
+          </p>
+          <p>
+            For Vigenère ciphers, the system supports keys up to 10 characters in length and requires a minimum of 50 characters of ciphertext to ensure statistical significance in the frequency analysis.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedCipher = null;
+    let selectedEncryptCipher = null;
+    const ciphertextEl = document.getElementById('ciphertext');
+    const counterEl = document.getElementById('char-counter');
+    const decryptBtn = document.getElementById('decrypt-btn');
+    const resultSection = document.getElementById('result-section');
+    const loadingEl = document.getElementById('loading');
+
+    // Encrypt page elements
+    const plaintextEl = document.getElementById('plaintext-input');
+    const keyInputEl = document.getElementById('key-input');
+    const encryptCounterEl = document.getElementById('encrypt-char-counter');
+    const encryptBtn = document.getElementById('encrypt-btn');
+    const encryptResultSection = document.getElementById('encrypt-result-section');
+    const keyHintEl = document.getElementById('key-hint');
+
+    // Theme toggle
+    function toggleTheme() {
+      const currentTheme = document.body.getAttribute('data-theme');
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', newTheme);
+    }
+
+    // Page navigation
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = link.getAttribute('data-page');
+        showPage(page);
+        
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      });
+    });
+
+    function showPage(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(`${page}-page`).classList.add('active');
+    }
+
+    // Cipher selection
+    function selectCipher(type) {
+      selectedCipher = type;
+      document.querySelectorAll('.cipher-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      event.target.closest('.cipher-card').classList.add('selected');
+      updateDecryptButton();
+    }
+
+    // Character counter
+    ciphertextEl.addEventListener('input', () => {
+      const length = ciphertextEl.value.length;
+      counterEl.textContent = `${length} characters`;
+      
+      if (selectedCipher === 'vigenere') {
+        if (length < 40) {
+          counterEl.classList.add('warning');
+          counterEl.classList.remove('valid');
+          counterEl.textContent = `${length} characters (minimum 40 required for Vigenère)`;
+        } else {
+          counterEl.classList.add('valid');
+          counterEl.classList.remove('warning');
+          counterEl.textContent = `${length} characters`;
+        }
+      } else {
+        counterEl.classList.remove('warning', 'valid');
+      }
+      
+      updateDecryptButton();
+    });
+
+    function updateDecryptButton() {
+      const text = ciphertextEl.value.trim();
+      const isValid = selectedCipher && text.length > 0 && 
+                     (selectedCipher === 'caesar' || text.length >= 40);
+      decryptBtn.disabled = !isValid;
+    }
+
+    async function breakCipher() {
+      const text = ciphertextEl.value.trim();
+      if (!selectedCipher || !text) return;
+
+      if (selectedCipher === 'vigenere' && text.length < 40) {
+        alert('Vigenère cipher requires at least 40 characters for accurate decryption.');
+        return;
+      }
+
+      // Disable button to prevent multiple requests
+      decryptBtn.disabled = true;
+      resultSection.classList.remove('show');
+      loadingEl.style.display = 'block';
+
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/decrypt/${selectedCipher}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ciphertext: text })
+        });
+
+        if (!response.ok) {
+          throw new Error('Decryption failed');
+        }
+
+        const data = await response.json();
+        
+        document.getElementById('plaintext').textContent = data.plaintext || 'N/A';
+        
+        // Display key
+        const keyDisplay = selectedCipher === 'caesar' ? `Shift: ${data.key}` : data.key || 'N/A';
+        document.getElementById('key').textContent = keyDisplay;
+
+        // Show efficiency comparison for Vigenère
+        const efficiencyBox = document.getElementById('efficiency-box');
+        if (selectedCipher === 'vigenere' && data.key) {
+          const keyLength = data.key.length;
+          const bruteForceAttempts = Math.pow(26, keyLength);
+          
+          // Estimate CEM iterations (typically 50-200 iterations depending on key length)
+          const estimatedIterations = 50 + (keyLength * 20);
+          
+          const efficiencyText = `
+            <strong>Cross Entropy Method:</strong> ~${estimatedIterations} iterations<br>
+            <strong>Brute Force:</strong> ${bruteForceAttempts.toLocaleString()} iterations<br>
+            <br>
+            <span style="color: var(--success); font-weight: 600;">
+              Brute Force would run roughly ${Math.floor(bruteForceAttempts / estimatedIterations).toLocaleString()} times more combinations
+            </span>
+          `;
+          
+          document.getElementById('efficiency').innerHTML = efficiencyText;
+          efficiencyBox.style.display = 'block';
+        } else {
+          efficiencyBox.style.display = 'none';
+        }
+
+        loadingEl.style.display = 'none';
+        resultSection.classList.add('show');
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Re-enable button after successful decryption
+        decryptBtn.disabled = false;
+      } catch (error) {
+        loadingEl.style.display = 'none';
+        alert('Error: Unable to decrypt. Make sure the API server is running on http://127.0.0.1:8000');
+        console.error(error);
+        
+        // Re-enable button after error
+        decryptBtn.disabled = false;
+      }
+    }
+
+    // Encrypt page functions
+    function selectEncryptCipher(type) {
+      selectedEncryptCipher = type;
+      const cards = document.querySelectorAll('#encrypt-page .cipher-card');
+      cards.forEach(card => card.classList.remove('selected'));
+      event.target.closest('.cipher-card').classList.add('selected');
+      
+      // Reset key input
+      keyInputEl.value = '';
+      
+      if (type === 'caesar') {
+        keyInputEl.maxLength = 1;
+        keyInputEl.placeholder = 'Enter one letter (A-Z)';
+        keyHintEl.textContent = 'Enter a single letter from A to Z for Caesar cipher';
+      } else {
+        keyInputEl.maxLength = 10;
+        keyInputEl.placeholder = 'Enter key (2-10 letters)';
+        keyHintEl.textContent = 'Enter a letter key between 2-10 characters (e.g., "LEMON")';
+      }
+      
+      updateEncryptButton();
+    }
+
+    // Character counter for encrypt
+    plaintextEl.addEventListener('input', () => {
+      const length = plaintextEl.value.length;
+      encryptCounterEl.textContent = `${length} characters`;
+      updateEncryptButton();
+    });
+
+    keyInputEl.addEventListener('input', (e) => {
+      // Only allow letters and convert to uppercase
+      let value = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+      
+      // Apply length restrictions based on cipher type
+      if (selectedEncryptCipher === 'caesar') {
+        value = value.slice(0, 1);
+      } else if (selectedEncryptCipher === 'vigenere') {
+        value = value.slice(0, 10);
+      }
+      
+      e.target.value = value;
+      
+      // Update hint with character count for Vigenere
+      if (selectedEncryptCipher === 'vigenere') {
+        const len = value.length;
+        if (len === 0) {
+          keyHintEl.textContent = 'Enter a letter key between 2-10 characters (e.g., "LEMON")';
+          keyHintEl.classList.remove('warning', 'valid');
+        } else if (len === 1) {
+          keyHintEl.textContent = `${len} character - need at least 2 characters`;
+          keyHintEl.classList.add('warning');
+          keyHintEl.classList.remove('valid');
+        } else if (len >= 2 && len <= 10) {
+          keyHintEl.textContent = `${len} characters - valid key length`;
+          keyHintEl.classList.add('valid');
+          keyHintEl.classList.remove('warning');
+        }
+      } else if (selectedEncryptCipher === 'caesar') {
+        if (value.length === 1) {
+          keyHintEl.textContent = 'Valid key';
+          keyHintEl.classList.add('valid');
+          keyHintEl.classList.remove('warning');
+        } else {
+          keyHintEl.textContent = 'Enter a single letter from A to Z for Caesar cipher';
+          keyHintEl.classList.remove('warning', 'valid');
+        }
+      }
+      
+      updateEncryptButton();
+    });
+
+    function updateEncryptButton() {
+      const text = plaintextEl.value.trim();
+      const key = keyInputEl.value.trim();
+      
+      let isValid = false;
+      if (selectedEncryptCipher === 'caesar') {
+        isValid = text.length > 0 && key.length === 1 && /^[A-Z]$/.test(key);
+      } else if (selectedEncryptCipher === 'vigenere') {
+        isValid = text.length > 0 && key.length >= 2 && key.length <= 10 && /^[A-Z]+$/.test(key);
+      }
+      
+      encryptBtn.disabled = !isValid;
+    }
+
+    function caesarEncrypt(text, keyLetter) {
+      const shift = keyLetter.charCodeAt(0) - 65; // A=0, B=1, ..., Z=25
+      return text.split('').map(char => {
+        if (char.match(/[a-z]/i)) {
+          const code = char.charCodeAt(0);
+          const isUpper = char === char.toUpperCase();
+          const base = isUpper ? 65 : 97;
+          return String.fromCharCode(((code - base + shift) % 26) + base);
+        }
+        return char;
+      }).join('');
+    }
+
+    function vigenereEncrypt(text, key) {
+      key = key.toUpperCase();
+      let keyIndex = 0;
+      
+      return text.split('').map(char => {
+        if (char.match(/[a-z]/i)) {
+          const code = char.charCodeAt(0);
+          const isUpper = char === char.toUpperCase();
+          const base = isUpper ? 65 : 97;
+          const shift = key.charCodeAt(keyIndex % key.length) - 65;
+          keyIndex++;
+          return String.fromCharCode(((code - base + shift) % 26) + base);
+        }
+        return char;
+      }).join('');
+    }
+
+    function encryptText() {
+      const text = plaintextEl.value.trim();
+      const key = keyInputEl.value.trim();
+      
+      if (!selectedEncryptCipher || !text || !key) return;
+
+      let encrypted = '';
+      
+      if (selectedEncryptCipher === 'caesar') {
+        encrypted = caesarEncrypt(text, key);
+      } else if (selectedEncryptCipher === 'vigenere') {
+        encrypted = vigenereEncrypt(text, key);
+      }
+
+      document.getElementById('ciphertext-output').textContent = encrypted;
+      encryptResultSection.classList.add('show');
+      encryptResultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  </script>
+</body>
+</html>
